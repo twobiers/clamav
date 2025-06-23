@@ -345,6 +345,50 @@ class TC(testcase.TestCase):
         ]
         self.verify_output(output.out, expected=expected_results)
 
+    def test_zip64_all_files(self):
+        self.step_name('Test that clam will extract all files from a zip64.')
+
+        testfile = TC.path_tmp / 'multi-file.zip64'
+        with ZipFile(str(testfile), 'w', ZIP_DEFLATED, allowZip64=True) as zf:
+            with zf.open('file-0.txt', mode="w", force_zip64=True) as zi:
+                zi.write(b"Test file 0")
+            with zf.open('file-1.txt', mode="w", force_zip64=True) as zi:
+                zi.write(b"Test file 1")
+            with zf.open('file-2.txt', mode="w", force_zip64=True) as zi:
+                zi.write(b"Test file 2")
+            with zf.open('file-3.txt', mode="w", force_zip64=True) as zi:
+                zi.write(b"Test file 3")
+
+        # Calculate sha256 and len for all files
+        sha256s = {}
+        with ZipFile(str(testfile), 'r') as zf:
+            for name in zf.namelist():
+                data = zf.read(name)
+                sha256s[name] = ( hashlib.sha256(data).hexdigest(), len(data) )
+
+        # Make sha256 signatures for all files
+        with open(TC.path_db / 'missing_entries.hsb', 'w') as f:
+            for name, data in sha256s.items():
+                f.write(f"{data[0]}:{data[1]}:{name}.NDB:73\n")
+
+        command = '{valgrind} {valgrind_args} {clamscan} -d {missing_entries_db} --allmatch {testfiles}'.format(
+            valgrind=TC.valgrind, valgrind_args=TC.valgrind_args, clamscan=TC.clamscan,
+            # We can't use the hash sig for this clam.exe program because the hash goes out the window when we concatenate on the zip.
+            missing_entries_db=TC.path_db / 'missing_entries.hsb',
+            testfiles=testfile,
+        )
+        output = self.execute_command(command)
+
+        assert output.ec == 1  # virus
+
+        expected_results = [
+            'file-0.txt.NDB.UNOFFICIAL FOUND',
+            'file-1.txt.NDB.UNOFFICIAL FOUND',
+            'file-2.txt.NDB.UNOFFICIAL FOUND',
+            'file-3.txt.NDB.UNOFFICIAL FOUND',
+        ]
+        self.verify_output(output.out, expected=expected_results)
+
     def test_zip_no_central_directory(self):
         self.step_name('Test that clam will extract files from a zip with no central directory.')
 
