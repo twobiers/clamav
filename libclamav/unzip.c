@@ -57,6 +57,8 @@
 // clang-format off
 #define ZIP_MAGIC_CENTRAL_DIRECTORY_RECORD_BEGIN    (0x02014b50)
 #define ZIP_MAGIC_CENTRAL_DIRECTORY_RECORD_END      (0x06054b50)
+#define ZIP64_MAGIC_OFFSET                          (0xffffffff)
+#define ZIP64_MAGIC_CENTRAL_DIRECTORY_RECORD_END    (0x06064b50)
 #define ZIP_MAGIC_LOCAL_FILE_HEADER                 (0x04034b50)
 #define ZIP_MAGIC_FILE_BEGIN_SPLIT_OR_SPANNED       (0x08074b50)
 // clang-format on
@@ -1647,6 +1649,9 @@ cl_error_t cli_unzip(cli_ctx *ctx)
             continue;
         if (cli_readint32(ptr) == ZIP_MAGIC_CENTRAL_DIRECTORY_RECORD_END) {
             uint32_t chptr = cli_readint32(&ptr[16]);
+            if (chptr == ZIP64_MAGIC_OFFSET) {
+                cli_dbgmsg("cli_unzip: ZIP64 detected\n");
+            }
             if (!CLI_ISCONTAINED_0_TO(fsize, chptr, SIZEOF_CENTRAL_HEADER)) continue;
             coff = chptr;
             break;
